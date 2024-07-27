@@ -1,14 +1,47 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 import json
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+class ProjectSelectionDialog:
+    def __init__(self, parent, title, projects):
+        self.top = tk.Toplevel(parent)
+        self.top.title(title)
+        self.top.geometry("300x200")
+        self.result = None
+
+        frame = ttk.Frame(self.top)
+        frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+
+        self.listbox = tk.Listbox(frame)
+        self.listbox.pack(fill=tk.BOTH, expand=True)
+        for project in projects:
+            self.listbox.insert(tk.END, project)
+
+        self.listbox.bind('<Double-1>', self.on_double_click)
+
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(fill=tk.X, pady=10)
+
+        ttk.Button(button_frame, text="OK", command=self.on_ok).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=self.on_cancel).pack(side=tk.RIGHT, padx=5)
+
+    def on_double_click(self, event):
+        self.on_ok()
+
+    def on_ok(self):
+        selection = self.listbox.curselection()
+        if selection:
+            self.result = self.listbox.get(selection[0])
+            self.top.destroy()
+
+    def on_cancel(self):
+        self.top.destroy()
 
 class ProjectManager:
     def __init__(self, master):
         self.master = master
         self.master.title("Project Manager")
-        self.master.geometry("1000x900")
+        self.master.geometry("800x600")
 
         self.projects = {}
         self.current_project = None
@@ -33,7 +66,7 @@ class ProjectManager:
         self.status_frame = ttk.LabelFrame(self.master, text="Project Progress")
         self.status_frame.pack(pady=10, padx=10, fill=tk.X)
 
-        self.status_bar = ttk.Progressbar(self.status_frame, length=900, mode='determinate')
+        self.status_bar = ttk.Progressbar(self.status_frame, length=600, mode='determinate')
         self.status_bar.pack(pady=10)
 
         self.status_label = ttk.Label(self.status_frame, text="No project selected")
@@ -43,7 +76,13 @@ class ProjectManager:
         self.task_frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
 
         self.task_canvas = tk.Canvas(self.task_frame, bg="#323232")
-        self.task_canvas.pack(fill=tk.BOTH, expand=True)
+        self.task_canvas.pack(side="left", fill=tk.BOTH, expand=True)
+
+        self.scrollbar = ttk.Scrollbar(self.task_frame, orient="vertical", command=self.task_canvas.yview)
+        self.scrollbar.pack(side="right", fill="y")
+
+        self.task_canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.task_canvas.bind('<Configure>', self.on_canvas_configure)
 
         self.button_frame = ttk.Frame(self.master)
         self.button_frame.pack(pady=10, fill=tk.X)
@@ -55,26 +94,20 @@ class ProjectManager:
         ttk.Button(button_frame_bottom, text="Complete Task", command=self.complete_task).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame_bottom, text="Remove Task", command=self.remove_task).pack(side=tk.LEFT, padx=5)
 
-        self.charts_frame = ttk.LabelFrame(self.master, text="Statistics")
-        self.charts_frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
-
-        self.pie_chart_frame = ttk.Frame(self.charts_frame)
-        self.pie_chart_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        self.bar_chart_frame = ttk.Frame(self.charts_frame)
-        self.bar_chart_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+    def on_canvas_configure(self):
+        self.task_canvas.configure(scrollregion=self.task_canvas.bbox("all"))
 
     def select_project(self):
-        project_list = list(self.projects.keys())
-        if not project_list:
+        if not self.projects:
             messagebox.showinfo("No Projects", "There are no projects. Please add a project first.")
             return
-        project_name = simpledialog.askstring("Select Project", "Choose a project:", initialvalue=project_list[0])
-        if project_name in self.projects:
-            self.current_project = project_name
+        
+        dialog = ProjectSelectionDialog(self.master, "Select Project", self.projects.keys())
+        self.master.wait_window(dialog.top)
+        
+        if dialog.result:
+            self.current_project = dialog.result
             self.load_project()
-        elif project_name:
-            messagebox.showerror("Error", "Project does not exist")
 
     def new_project(self):
         project_name = simpledialog.askstring("New Project", "Enter project name:")
@@ -82,28 +115,31 @@ class ProjectManager:
             self.projects[project_name] = {"tasks": [], "completed": []}
             self.current_project = project_name
             self.load_project()
-            self.update_charts()
-            self.update_status_bar()
         elif project_name in self.projects:
             messagebox.showerror("Error", "Project already exists")
 
     def remove_project(self):
-        if self.current_project:
-            if messagebox.askyesno("Remove Project", f"Are you sure you want to remove the project '{self.current_project}'?"):
-                del self.projects[self.current_project]
-                self.current_project = None
-                self.task_canvas.delete("all")
-                self.master.title("Project Manager")
-                self.update_charts()
-                self.update_status_bar()
-        else:
-            messagebox.showerror("Error", "No project selected")
+        if not self.projects:
+            messagebox.showinfo("No Projects", "There are no projects to remove.")
+            return
+        
+        dialog = ProjectSelectionDialog(self.master, "Remove Project", self.projects.keys())
+        self.master.wait_window(dialog.top)
+        
+        if dialog.result:
+            if messagebox.askyesno("Remove Project", f"Are you sure you want to remove the project '{dialog.result}'?"):
+                del self.projects[dialog.result]
+                if self.current_project == dialog.result:
+                    self.current_project = None
+                    self.task_canvas.delete("all")
+                    self.master.title("Project Manager")
+                    self.update_status_bar()
+                messagebox.showinfo("Project Removed", f"Project '{dialog.result}' has been removed.")
 
     def load_project(self):
         if self.current_project:
             self.master.title(f"Project Manager - {self.current_project}")
             self.update_task_list()
-            self.update_charts()
             self.update_status_bar()
 
     def update_task_list(self):
@@ -132,7 +168,6 @@ class ProjectManager:
         if task:
             self.projects[self.current_project]["tasks"].append(task)
             self.update_task_list()
-            self.update_charts()
             self.update_status_bar()
 
     def remove_task(self):
@@ -149,7 +184,6 @@ class ProjectManager:
                 messagebox.showerror("Error", "Task not found")
                 return
             self.update_task_list()
-            self.update_charts()
             self.update_status_bar()
 
     def complete_task(self):
@@ -161,48 +195,9 @@ class ProjectManager:
             self.projects[self.current_project]["tasks"].remove(task)
             self.projects[self.current_project]["completed"].append(task)
             self.update_task_list()
-            self.update_charts()
             self.update_status_bar()
         else:
             messagebox.showerror("Error", "Task not found or already completed")
-
-    def update_charts(self):
-        self.update_pie_chart()
-        self.update_bar_chart()
-
-    def update_pie_chart(self):
-        for widget in self.pie_chart_frame.winfo_children():
-            widget.destroy()
-
-        if self.current_project:
-            completed = len(self.projects[self.current_project]["completed"])
-            uncompleted = len(self.projects[self.current_project]["tasks"])
-            
-            fig, ax = plt.subplots(figsize=(4, 3))
-            ax.pie([completed, uncompleted], labels=['Completed', 'Uncompleted'], autopct='%1.1f%%')
-            ax.set_title(f"Task Status for {self.current_project}")
-
-            canvas = FigureCanvasTkAgg(fig, master=self.pie_chart_frame)
-            canvas.draw()
-            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-
-    def update_bar_chart(self):
-        for widget in self.bar_chart_frame.winfo_children():
-            widget.destroy()
-
-        project_names = list(self.projects.keys())
-        task_counts = [len(project["tasks"]) + len(project["completed"]) for project in self.projects.values()]
-
-        fig, ax = plt.subplots(figsize=(4, 3))
-        ax.bar(project_names, task_counts)
-        ax.set_title("Tasks per Project")
-        ax.set_xlabel("Projects")
-        ax.set_ylabel("Number of Tasks")
-        plt.xticks(rotation=45, ha='right')
-
-        canvas = FigureCanvasTkAgg(fig, master=self.bar_chart_frame)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
     def update_status_bar(self):
         if self.current_project:
