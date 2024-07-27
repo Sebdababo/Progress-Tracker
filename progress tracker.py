@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 import json
 from datetime import date
 
@@ -7,7 +7,7 @@ class ProjectManager:
     def __init__(self, master):
         self.master = master
         self.master.title("Project Manager")
-        self.master.geometry("800x600")
+        self.master.geometry("600x400")
 
         self.projects = {}
         self.current_project = None
@@ -16,7 +16,6 @@ class ProjectManager:
         self.load_data()
 
     def create_widgets(self):
-        # Project selection
         self.project_frame = ttk.Frame(self.master)
         self.project_frame.pack(pady=10)
 
@@ -28,7 +27,6 @@ class ProjectManager:
 
         ttk.Button(self.project_frame, text="New Project", command=self.new_project).grid(row=0, column=2, padx=5)
 
-        # Checkpoint frame
         self.checkpoint_frame = ttk.LabelFrame(self.master, text="Checkpoints")
         self.checkpoint_frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
 
@@ -39,7 +37,6 @@ class ProjectManager:
         checkpoint_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.checkpoint_listbox.config(yscrollcommand=checkpoint_scrollbar.set)
 
-        # Checkpoint controls
         self.checkpoint_controls = ttk.Frame(self.master)
         self.checkpoint_controls.pack(pady=5)
 
@@ -49,7 +46,6 @@ class ProjectManager:
         ttk.Button(self.checkpoint_controls, text="Add Checkpoint", command=self.add_checkpoint).grid(row=0, column=1, padx=5)
         ttk.Button(self.checkpoint_controls, text="Complete Checkpoint", command=self.complete_checkpoint).grid(row=0, column=2, padx=5)
 
-        # Daily log
         self.log_frame = ttk.LabelFrame(self.master, text="Daily Log")
         self.log_frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
 
@@ -59,32 +55,40 @@ class ProjectManager:
         ttk.Button(self.log_frame, text="Add Log", command=self.add_log).pack(side=tk.LEFT, padx=5)
 
     def new_project(self):
-        project_name = tk.simpledialog.askstring("New Project", "Enter project name:")
-        if project_name:
+        project_name = simpledialog.askstring("New Project", "Enter project name:")
+        if project_name and project_name not in self.projects:
             self.projects[project_name] = {"checkpoints": [], "completed": [], "logs": []}
             self.update_project_list()
             self.project_var.set(project_name)
             self.load_project()
+        elif project_name in self.projects:
+            messagebox.showerror("Error", "Project already exists")
 
     def update_project_list(self):
         self.project_dropdown['values'] = list(self.projects.keys())
 
     def load_project(self, event=None):
         self.current_project = self.project_var.get()
-        self.checkpoint_listbox.delete(0, tk.END)
-        for checkpoint in self.projects[self.current_project]["checkpoints"]:
-            self.checkpoint_listbox.insert(tk.END, checkpoint)
-        for checkpoint in self.projects[self.current_project]["completed"]:
-            self.checkpoint_listbox.insert(tk.END, f"✓ {checkpoint}")
+        if self.current_project:
+            self.checkpoint_listbox.delete(0, tk.END)
+            for checkpoint in self.projects[self.current_project]["checkpoints"]:
+                self.checkpoint_listbox.insert(tk.END, checkpoint)
+            for checkpoint in self.projects[self.current_project]["completed"]:
+                self.checkpoint_listbox.insert(tk.END, f"✓ {checkpoint}")
 
     def add_checkpoint(self):
-        checkpoint = self.checkpoint_entry.get()
-        if checkpoint:
+        checkpoint = self.checkpoint_entry.get().strip()
+        if checkpoint and self.current_project:
             self.projects[self.current_project]["checkpoints"].append(checkpoint)
             self.checkpoint_listbox.insert(tk.END, checkpoint)
             self.checkpoint_entry.delete(0, tk.END)
+        elif not self.current_project:
+            messagebox.showerror("Error", "Please select a project first")
 
     def complete_checkpoint(self):
+        if not self.current_project:
+            messagebox.showerror("Error", "Please select a project first")
+            return
         selection = self.checkpoint_listbox.curselection()
         if selection:
             index = selection[0]
@@ -94,14 +98,18 @@ class ProjectManager:
                 self.projects[self.current_project]["completed"].append(checkpoint)
                 self.checkpoint_listbox.delete(index)
                 self.checkpoint_listbox.insert(tk.END, f"✓ {checkpoint}")
+        else:
+            messagebox.showerror("Error", "Please select a checkpoint to complete")
 
     def add_log(self):
-        log_entry = self.log_entry.get()
-        if log_entry:
+        log_entry = self.log_entry.get().strip()
+        if log_entry and self.current_project:
             today = date.today().isoformat()
             self.projects[self.current_project]["logs"].append((today, log_entry))
             self.log_entry.delete(0, tk.END)
             messagebox.showinfo("Log Added", "Daily log entry has been added.")
+        elif not self.current_project:
+            messagebox.showerror("Error", "Please select a project first")
 
     def save_data(self):
         with open("project_data.json", "w") as f:
