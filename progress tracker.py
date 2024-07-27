@@ -24,15 +24,15 @@ class ProjectManager:
         button_frame_top = ttk.Frame(self.project_frame)
         button_frame_top.pack(expand=True)
 
-        ttk.Button(button_frame_top, text="Select Project", command=self.select_project).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame_top, text="New Project", command=self.new_project).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame_top, text="Select Project", command=self.select_project).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame_top, text="Remove Project", command=self.remove_project).pack(side=tk.LEFT, padx=5)
 
         self.checkpoint_frame = ttk.LabelFrame(self.master, text="Checkpoints")
         self.checkpoint_frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
 
-        self.checkpoint_listbox = tk.Listbox(self.checkpoint_frame, bg="black", fg="white")
-        self.checkpoint_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.checkpoint_canvas = tk.Canvas(self.checkpoint_frame, bg="#323232")
+        self.checkpoint_canvas.pack(fill=tk.BOTH, expand=True)
 
         self.button_frame = ttk.Frame(self.master)
         self.button_frame.pack(pady=10, fill=tk.X)
@@ -41,8 +41,8 @@ class ProjectManager:
         button_frame_bottom.pack(expand=True)
 
         ttk.Button(button_frame_bottom, text="Add Checkpoint", command=self.add_checkpoint).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame_bottom, text="Remove Checkpoint", command=self.remove_checkpoint).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame_bottom, text="Complete Checkpoint", command=self.complete_checkpoint).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame_bottom, text="Remove Checkpoint", command=self.remove_checkpoint).pack(side=tk.LEFT, padx=5)
 
     def select_project(self):
         project_list = list(self.projects.keys())
@@ -70,7 +70,8 @@ class ProjectManager:
             if messagebox.askyesno("Remove Project", f"Are you sure you want to remove the project '{self.current_project}'?"):
                 del self.projects[self.current_project]
                 self.current_project = None
-                self.checkpoint_listbox.delete(0, tk.END)
+                self.checkpoint_canvas.delete("all")
+                self.master.title("Project Manager")
         else:
             messagebox.showerror("Error", "No project selected")
 
@@ -80,11 +81,22 @@ class ProjectManager:
             self.update_checkpoint_list()
 
     def update_checkpoint_list(self):
-        self.checkpoint_listbox.delete(0, tk.END)
+        self.checkpoint_canvas.delete("all")
+        y_offset = 10
         for checkpoint in self.projects[self.current_project]["checkpoints"]:
-            self.checkpoint_listbox.insert(tk.END, checkpoint)
+            self.draw_checkpoint(checkpoint, y_offset, completed=False)
+            y_offset += 40
         for checkpoint in self.projects[self.current_project]["completed"]:
-            self.checkpoint_listbox.insert(tk.END, f"✓ {checkpoint}")
+            self.draw_checkpoint(checkpoint, y_offset, completed=True)
+            y_offset += 40
+
+    def draw_checkpoint(self, checkpoint, y_offset, completed=False):
+        x1, y1 = 10, y_offset
+        x2, y2 = 100, y_offset + 30
+        fill_color = "#1c0b9c"
+        self.checkpoint_canvas.create_rectangle(x1, y1, x2, y2, fill=fill_color, outline="black", width=2, tags="checkpoint")
+        text = f"{checkpoint} ✓" if completed else checkpoint
+        self.checkpoint_canvas.create_text(x1 + 10, (y1 + y2) / 2, text=text, anchor="w", tags="checkpoint")
 
     def add_checkpoint(self):
         if not self.current_project:
@@ -99,33 +111,28 @@ class ProjectManager:
         if not self.current_project:
             messagebox.showerror("Error", "Please select a project first")
             return
-        selection = self.checkpoint_listbox.curselection()
-        if selection:
-            index = selection[0]
-            checkpoint = self.checkpoint_listbox.get(index)
-            if checkpoint.startswith("✓ "):
-                checkpoint = checkpoint[2:]
+        checkpoint = simpledialog.askstring("Remove Checkpoint", "Enter checkpoint name to remove:")
+        if checkpoint:
+            if checkpoint in self.projects[self.current_project]["checkpoints"]:
+                self.projects[self.current_project]["checkpoints"].remove(checkpoint)
+            elif checkpoint in self.projects[self.current_project]["completed"]:
                 self.projects[self.current_project]["completed"].remove(checkpoint)
             else:
-                self.projects[self.current_project]["checkpoints"].remove(checkpoint)
+                messagebox.showerror("Error", "Checkpoint not found")
+                return
             self.update_checkpoint_list()
-        else:
-            messagebox.showerror("Error", "Please select a checkpoint to remove")
 
     def complete_checkpoint(self):
         if not self.current_project:
             messagebox.showerror("Error", "Please select a project first")
             return
-        selection = self.checkpoint_listbox.curselection()
-        if selection:
-            index = selection[0]
-            checkpoint = self.checkpoint_listbox.get(index)
-            if not checkpoint.startswith("✓"):
-                self.projects[self.current_project]["checkpoints"].remove(checkpoint)
-                self.projects[self.current_project]["completed"].append(checkpoint)
-                self.update_checkpoint_list()
+        checkpoint = simpledialog.askstring("Complete Checkpoint", "Enter checkpoint name to complete:")
+        if checkpoint and checkpoint in self.projects[self.current_project]["checkpoints"]:
+            self.projects[self.current_project]["checkpoints"].remove(checkpoint)
+            self.projects[self.current_project]["completed"].append(checkpoint)
+            self.update_checkpoint_list()
         else:
-            messagebox.showerror("Error", "Please select a checkpoint to complete")
+            messagebox.showerror("Error", "Checkpoint not found or already completed")
 
     def save_data(self):
         with open("project_data.json", "w") as f:
