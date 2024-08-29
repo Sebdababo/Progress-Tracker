@@ -64,3 +64,7 @@ The Project Manager application is a simple desktop tool built using Python's Tk
 
 ## Closing the Application
 - Data is automatically saved when the application window is closed.
+
+## Example Usage
+![Progress Tracker output](https://github.com/user-attachments/assets/7b20a554-a55f-4210-8707-7ac1025a8574)
+
