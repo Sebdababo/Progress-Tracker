@@ -21,6 +21,7 @@ The Project Manager application is a simple desktop tool built using Python's Tk
     ```
 2. **Run the Application**:
     ```bash
+    pip install -r requirements.txt
     python progress tracker.py
     ```
 
