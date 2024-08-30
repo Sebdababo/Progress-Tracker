@@ -158,7 +158,7 @@ class ProjectManager:
         fill_color = "#1c0b9c"
         self.task_canvas.create_rectangle(x1, y1, x2, y2, fill=fill_color, outline="black", width=2, tags="task")
         text = f"{task} ✓" if completed else task
-        self.task_canvas.create_text(x1 + 10, (y1 + y2) / 2, text=text, anchor="w", tags="task")
+        self.task_canvas.create_text(x1 + 10, (y1 + y2) / 2, text=text, anchor="w", tags="task")    
 
     def add_task(self):
         if not self.current_project:
